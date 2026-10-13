@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black Hole</title>
+<style>
+  :root {
+    --size: min(62vmin, 560px);   /* change this to make the black hole bigger or smaller */
+    --mx: 0;                      /* mouse X, from -1 to 1 (set by JavaScript) */
+    --my: 0;                      /* mouse Y, from -1 to 1 (set by JavaScript) */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+
+  /* ---------- Stars ---------- */
+  .stars {
+    position: fixed;
+    top: 0; left: 0;
+    width: 2px; height: 2px;
+    border-radius: 50%;
+    background: transparent;
+  }
+  .stars.far  { transform: translate(calc(var(--mx) * -8px),  calc(var(--my) * -8px)); }
+  .stars.near { transform: translate(calc(var(--mx) * -22px), calc(var(--my) * -22px)); }
+
+  /* ---------- Black hole ---------- */
+  .hole {
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+    transform:
+      translate(calc(var(--mx) * 28px), calc(var(--my) * 28px))
+      rotate(calc(var(--mx) * 5deg));
+  }
+
+  .hole > * {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+  }
+
+  /* Soft glow around everything */
+  .glow {
+    inset: -35%;
+    background: radial-gradient(circle,
+      rgba(255, 170, 70, 0.55) 0%,
+      rgba(255, 120, 30, 0.25) 32%,
+      transparent 62%);
+    filter: blur(14px);
+  }
+
+  /* Light bent over the top and under the bottom of the hole */
+  .lens {
+    inset: -6%;
+    background: radial-gradient(circle,
+      transparent 0 41%,
+      #ffffff 44%,
+      #fff0c8 46%,
+      #ffb84d 49%,
+      rgba(255, 130, 30, 0.6) 54%,
+      transparent 62%);
+    filter: blur(1.5px) brightness(1.3) drop-shadow(0 0 14px rgba(255, 170, 60, 0.9));
+    transform: scale(calc(1 + var(--my) * 0.03), calc(1 - var(--my) * 0.03));
+  }
+
+  /* The flat disk of gas. Two copies: one behind the hole, one in front. */
+  .disk {
+    inset: -42%;
+    transform: perspective(900px) rotateX(calc(80deg - var(--my) * 14deg));
+  }
+  .disk .spin {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      #ffb347, #ffffff, #ff8c1a, #fff0c0, #ff7a00,
+      #fffbe8, #ff9a2e, #ffffff, #ffb347);
+    -webkit-mask-image: radial-gradient(circle, transparent 0 33%, #000 40%, #000 56%, transparent 72%);
+            mask-image: radial-gradient(circle, transparent 0 33%, #000 40%, #000 56%, transparent 72%);
+    filter: blur(1.2px) brightness(1.5) saturate(1.4) drop-shadow(0 0 18px rgba(255, 160, 50, 0.8));
+    animation: spin 14s linear infinite;
+  }
+  .disk.front { clip-path: inset(50% 0 0 0); }   /* only the lower half passes in front */
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* The black circle in the middle (the shadow) */
+  .shadow {
+    inset: 8%;
+    background: #000;
+    box-shadow: 0 0 40px 10px rgba(0, 0, 0, 0.9);
+  }
+
+  /* ---------- Text ---------- */
+  .hint {
+    position: fixed;
+    bottom: 28px;
+    left: 0; right: 0;
+    text-align: center;
+    color: rgba(255, 226, 176, 0.85);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .disk .spin { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="stars far"  id="starsFar"></div>
+  <div class="stars near" id="starsNear"></div>
+
+  <div class="hole">
+    <div class="glow"></div>
+    <div class="lens"></div>
+    <div class="disk back"><div class="spin"></div></div>
+    <div class="shadow"></div>
+    <div class="disk front"><div class="spin"></div></div>
+  </div>
+
+  <p class="hint">Move your mouse</p>
+
+<script>
+  // 1. Make random stars (box-shadow trick: one tiny dot, many shadows)
+  function makeStars(id, count, maxSize) {
+    var shadows = [];
+    for (var i = 0; i < count; i++) {
+      var x = Math.random() * 100;
+      var y = Math.random() * 100;
+      var s = (Math.random() * maxSize).toFixed(1);
+      var a = (0.3 + Math.random() * 0.7).toFixed(2);
+      shadows.push(x + "vw " + y + "vh 0 " + s + "px rgba(255,255,255," + a + ")");
+    }
+    document.getElementById(id).style.boxShadow = shadows.join(",");
+  }
+  makeStars("starsFar", 160, 0.4);
+  makeStars("starsNear", 70, 0.9);
+
+  // 2. Follow the mouse (smoothly)
+  var root = document.documentElement;
+  var targetX = 0, targetY = 0, currentX = 0, currentY = 0;
+
+  function setTarget(clientX, clientY) {
+    targetX = (clientX / window.innerWidth) * 2 - 1;    // -1 (left) to 1 (right)
+    targetY = (clientY / window.innerHeight) * 2 - 1;   // -1 (top) to 1 (bottom)
+  }
+
+  window.addEventListener("mousemove", function (e) { setTarget(e.clientX, e.clientY); });
+  window.addEventListener("touchmove", function (e) {
+    setTarget(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  function animate() {
+    currentX += (targetX - currentX) * 0.06;   // lower number = slower, smoother
+    currentY += (targetY - currentY) * 0.06;
+    root.style.setProperty("--mx", currentX.toFixed(4));
+    root.style.setProperty("--my", currentY.toFixed(4));
+    requestAnimationFrame(animate);
+  }
+  animate();
+</script>
+</body>
+</html>
